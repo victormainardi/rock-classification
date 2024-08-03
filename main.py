@@ -1,5 +1,6 @@
-import streamlit as st
 import os
+import streamlit as st
+
 # Importar outras bibliotecas
 import cv2
 import tempfile
@@ -81,7 +82,7 @@ def segment_image(image_path, model):
     return output_file, best_class_name, best_confidence
 
 def main():
-    st.title("Classificador de Rochas")
+    st.title("Classificador de Rochas - Grau de Esfericidade")
     st.subheader("Universidade Federal de Santa Maria")
     st.markdown("Carregue uma imagem para aplicar a segmentação de instâncias usando YOLOv8.")
     st.markdown("---")
@@ -112,6 +113,13 @@ def main():
         if use_camera and camera_image:
             process_image(camera_image, len(uploaded_files) if uploaded_files else 0, columns, model)
 
+    # Adicionar a observação no rodapé
+    st.markdown("""
+        <div style='position: fixed; bottom: 0; width: 100%; background-color: #262730; color: white; text-align: center; padding: 10px;'>
+            Qualquer dúvida, entre em contato com a Equipe de Suporte Técnico do LAGEOLAM - Laboratório de Geologia Ambiental - <a href='mailto:haline.ceccato@gmail.com' style='color: #1f77b4;'>haline.ceccato@gmail.com</a>
+        </div>
+        """, unsafe_allow_html=True)
+
 def process_image(image_file, index, columns, model):
     # Salvar a imagem em um arquivo temporário
     with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as temp_file:
@@ -131,10 +139,10 @@ def process_image(image_file, index, columns, model):
             st.image(image, caption=f"Imagem Segmentada - {image_file.name if hasattr(image_file, 'name') else 'Câmera'}", use_column_width=True)
             
             # Exibir a melhor classe detectada com percentual de certeza
-            st.markdown(f"**Resultados de saída:** {best_class_name.split('-')[1].capitalize()}: {best_confidence * 100:.2f}% de certeza")
+            st.markdown(f"**Saída:** {best_class_name.split('-')[1].capitalize()} - {best_confidence * 100:.2f}%")
 
             # Interface para revisão e ajuste manual
-            st.markdown("Revise e ajuste as classificações manualmente:")
+            st.markdown("Revise e ajuste as classificações manualmente")
             new_class = st.selectbox("Selecione a nova classe:", class_names, index=class_names.index(best_class_name), key=f"{image_file.name if hasattr(image_file, 'name') else 'camera'}-{index}")
             if st.button("Salvar alterações", key=f"save-{image_file.name if hasattr(image_file, 'name') else 'camera'}-{index}"):
                 st.write(f"Classe alterada para {new_class}")
