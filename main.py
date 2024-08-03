@@ -8,6 +8,7 @@ from PIL import Image
 from ultralytics import YOLO
 from pathlib import Path
 
+
 # Carregar o modelo YOLOv8 a partir de um arquivo local
 device = torch.device('cpu')
 model_path = 'models/yolov8_model.pt'  # Substitua pelo caminho correto do seu modelo
@@ -24,8 +25,6 @@ class_colors = {
     '3-alongado': (0, 0, 255),      # Blue
     '4-bem_alongado': (255, 255, 0) # Yellow
 }
-
-st.set_page_config(layout="wide")
 
 # Função para segmentação de instâncias
 def segment_image(image_path, model):
@@ -79,13 +78,14 @@ def segment_image(image_path, model):
     return output_file, class_counts, class_confidences, segments_info
 
 def main():
+    st.set_page_config(layout="wide")
     st.title("Segmentação de Instâncias com YOLOv8")
     st.write("Carregue uma imagem para aplicar a segmentação de instâncias usando YOLOv8.")
 
     uploaded_files = st.file_uploader("Escolha as imagens...", type=["jpg", "jpeg", "png", "tif", "tiff"], accept_multiple_files=True)
     
     if uploaded_files:
-        num_columns = 3  # Defina o número de colunas desejado
+        num_columns = 6  # Defina o número de colunas desejado
         columns = st.columns(num_columns)
 
         for i, uploaded_file in enumerate(uploaded_files):
