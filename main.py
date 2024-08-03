@@ -44,37 +44,39 @@ def segment_image(image_path, model):
     best_segment = None
     best_class_name = None
 
-    # Processar cada máscara segmentada
-    for i, mascara in enumerate(results[0].masks.xyn):
-        # Obter a classe detectada e a confiança
-        class_id = int(results[0].boxes.cls[i].item())
-        class_name = class_names[class_id]
-        confidence = results[0].boxes.conf[i].item()
+    # Verificar se existem máscaras detectadas
+    if results[0].masks is not None:
+        # Processar cada máscara segmentada
+        for i, mascara in enumerate(results[0].masks.xyn):
+            # Obter a classe detectada e a confiança
+            class_id = int(results[0].boxes.cls[i].item())
+            class_name = class_names[class_id]
+            confidence = results[0].boxes.conf[i].item()
 
-        # Selecionar a previsão com a maior confiança
-        if confidence > best_confidence:
-            best_confidence = confidence
-            best_segment = mascara
-            best_class_name = class_name
+            # Selecionar a previsão com a maior confiança
+            if confidence > best_confidence:
+                best_confidence = confidence
+                best_segment = mascara
+                best_class_name = class_name
 
-    if best_segment is not None:
-        # Obter as coordenadas x e y da melhor máscara
-        x = (best_segment[:, 0] * imagem_original.shape[1]).astype("int")
-        y = (best_segment[:, 1] * imagem_original.shape[0]).astype("int")
+        if best_segment is not None:
+            # Obter as coordenadas x e y da melhor máscara
+            x = (best_segment[:, 0] * imagem_original.shape[1]).astype("int")
+            y = (best_segment[:, 1] * imagem_original.shape[0]).astype("int")
 
-        # Definir a cor da máscara com base na classe
-        cor_preenchimento = class_colors[best_class_name]
+            # Definir a cor da máscara com base na classe
+            cor_preenchimento = class_colors[best_class_name]
 
-        # Desenhar a segmentação do YOLOv8 na imagem original
-        imagem_transparente = np.zeros_like(imagem_original, dtype=np.uint8)
-        cv2.polylines(imagem_transparente, [np.vstack((x, y)).T], isClosed=True, color=cor_preenchimento, thickness=2)
-        cv2.fillPoly(imagem_transparente, [np.vstack((x, y)).T], color=cor_preenchimento)
-        imagem_original = cv2.addWeighted(imagem_original, 1.0, imagem_transparente, 0.5, 0)
+            # Desenhar a segmentação do YOLOv8 na imagem original
+            imagem_transparente = np.zeros_like(imagem_original, dtype=np.uint8)
+            cv2.polylines(imagem_transparente, [np.vstack((x, y)).T], isClosed=True, color=cor_preenchimento, thickness=2)
+            cv2.fillPoly(imagem_transparente, [np.vstack((x, y)).T], color=cor_preenchimento)
+            imagem_original = cv2.addWeighted(imagem_original, 1.0, imagem_transparente, 0.5, 0)
 
-        # Adicionar texto de classificação e confiança
-        label = f"{best_class_name.split('-')[1].capitalize()}: {best_confidence * 100:.2f}%"
-        org = (x[0], y[0])  # Posição do texto
-        cv2.putText(imagem_original, label, org, cv2.FONT_HERSHEY_SIMPLEX, 0.6, cor_preenchimento, 2, cv2.LINE_AA)
+            # Adicionar texto de classificação e confiança
+            label = f"{best_class_name.split('-')[1].capitalize()}: {best_confidence * 100:.2f}%"
+            org = (x[0], y[0])  # Posição do texto
+            cv2.putText(imagem_original, label, org, cv2.FONT_HERSHEY_SIMPLEX, 0.6, cor_preenchimento, 2, cv2.LINE_AA)
 
     # Salvar a imagem segmentada em um arquivo temporário
     output_file = os.path.join(os.getcwd(), "output_segmented.jpg")
@@ -92,12 +94,16 @@ def main():
     st.markdown("### Escolha as imagens...")
     uploaded_files = st.file_uploader("", type=["jpg", "jpeg", "png", "tif", "tiff"], accept_multiple_files=True)
     
-    # Adicionar a opção de tirar uma foto da câmera
-    st.markdown("### Tire uma foto")
-    camera_container = st.empty()
-    camera_image = camera_container.camera_input("")
+    # Adicionar a opção para usar a câmera
+    use_camera = st.checkbox("Usar a câmera")
 
-    if uploaded_files or camera_image:
+    # Mostrar o input da câmera apenas se o checkbox estiver marcado
+    if use_camera:
+        st.markdown("### Tire uma foto")
+        camera_container = st.empty()
+        camera_image = camera_container.camera_input("")
+
+    if uploaded_files or (use_camera and camera_image):
         num_columns = 3  # Defina o número de colunas desejado
         columns = st.columns(num_columns)
 
@@ -107,7 +113,7 @@ def main():
                 process_image(uploaded_file, i, columns, model)
         
         # Processar imagem da câmera
-        if camera_image:
+        if use_camera and camera_image:
             process_image(camera_image, len(uploaded_files) if uploaded_files else 0, columns, model)
 
 def process_image(image_file, index, columns, model):
