@@ -8,6 +8,8 @@ from PIL import Image
 from ultralytics import YOLO
 from pathlib import Path
 
+# Tentar instalar a dependência do sistema
+os.system("apt-get update && apt-get install -y libgl1-mesa-glx")
 
 # Carregar o modelo YOLOv8 a partir de um arquivo local
 device = torch.device('cpu')
