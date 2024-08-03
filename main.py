@@ -86,7 +86,7 @@ def segment_image(image_path, model):
 
 def main():
     st.title("Classificador de Rochas")
-    st.subheader("Universidade Federal de Santa Maria")
+    st.subheader("Universidade Federal de Santa Maria (UFSM)")
     st.markdown("Carregue uma imagem para aplicar a segmentação de instâncias usando YOLOv8.")
     st.markdown("---")
 
@@ -135,13 +135,12 @@ def process_image(image_file, index, columns, model):
             st.image(image, caption=f"Imagem Segmentada - {image_file.name if hasattr(image_file, 'name') else 'Câmera'}", use_column_width=True)
             
             # Exibir a melhor classe detectada com percentual de certeza
-            st.markdown(f"**Resultados de saída:** {best_class_name.split('-')[1].capitalize()}: {best_confidence * 100:.2f}% de certeza")
+            st.markdown(f"**Saída:** {best_class_name.split('-')[1].capitalize()} - {best_confidence * 100:.2f}%")
 
             # Interface para revisão e ajuste manual
-            st.markdown("Revise e ajuste as classificações manualmente:")
-            new_class = st.selectbox("Selecione a nova classe:", class_names, index=class_names.index(best_class_name), key=f"{image_file.name if hasattr(image_file, 'name') else 'camera'}-{index}")
+            new_class = st.selectbox("Reclassificação:", class_names, index=class_names.index(best_class_name), key=f"{image_file.name if hasattr(image_file, 'name') else 'camera'}-{index}")
             if st.button("Salvar alterações", key=f"save-{image_file.name if hasattr(image_file, 'name') else 'camera'}-{index}"):
-                st.write(f"Classe alterada para {new_class}")
+                st.write(f"Classe alterada: {new_class}")
     else:
         st.write("Arquivo de saída não encontrado.")
 
