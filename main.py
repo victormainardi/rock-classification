@@ -1,15 +1,20 @@
 import os
-import tempfile
-import cv2
-import numpy as np
 import streamlit as st
+
+# Tentar instalar a dependência do sistema, se necessário
+os.system("apt-get update && apt-get install -y libgl1-mesa-glx")
+
+# Importar outras bibliotecas
+import cv2
+import tempfile
+import numpy as np
 import torch
 from PIL import Image
 from ultralytics import YOLO
 from pathlib import Path
 
-# Tentar instalar a dependência do sistema
-os.system("apt-get update && apt-get install -y libgl1-mesa-glx")
+# Definir a configuração da página para widescreen
+st.set_page_config(layout="wide")
 
 # Carregar o modelo YOLOv8 a partir de um arquivo local
 device = torch.device('cpu')
@@ -35,32 +40,30 @@ def segment_image(image_path, model):
 
     # Carregar a imagem original
     imagem_original = cv2.imread(image_path)
-    class_counts = {name: 0 for name in class_names}
-    class_confidences = {name: [] for name in class_names}
-    segments_info = []
+    best_confidence = 0
+    best_segment = None
+    best_class_name = None
 
     # Processar cada máscara segmentada
     for i, mascara in enumerate(results[0].masks.xyn):
-        # Obter as coordenadas x e y da máscara
-        x = (mascara[:, 0] * imagem_original.shape[1]).astype("int")
-        y = (mascara[:, 1] * imagem_original.shape[0]).astype("int")
-        
-        # Obter a classe detectada e incrementar a contagem
+        # Obter a classe detectada e a confiança
         class_id = int(results[0].boxes.cls[i].item())
         class_name = class_names[class_id]
         confidence = results[0].boxes.conf[i].item()
-        class_counts[class_name] += 1
-        class_confidences[class_name].append(confidence)
 
-        # Guardar informações do segmento para anotação
-        segments_info.append({
-            'coords': (x, y),
-            'class_name': class_name,
-            'confidence': confidence
-        })
+        # Selecionar a previsão com a maior confiança
+        if confidence > best_confidence:
+            best_confidence = confidence
+            best_segment = mascara
+            best_class_name = class_name
+
+    if best_segment is not None:
+        # Obter as coordenadas x e y da melhor máscara
+        x = (best_segment[:, 0] * imagem_original.shape[1]).astype("int")
+        y = (best_segment[:, 1] * imagem_original.shape[0]).astype("int")
 
         # Definir a cor da máscara com base na classe
-        cor_preenchimento = class_colors[class_name]
+        cor_preenchimento = class_colors[best_class_name]
 
         # Desenhar a segmentação do YOLOv8 na imagem original
         imagem_transparente = np.zeros_like(imagem_original, dtype=np.uint8)
@@ -69,7 +72,7 @@ def segment_image(image_path, model):
         imagem_original = cv2.addWeighted(imagem_original, 1.0, imagem_transparente, 0.5, 0)
 
         # Adicionar texto de classificação e confiança
-        label = f"{class_name.split('-')[1].capitalize()}: {confidence * 100:.2f}%"
+        label = f"{best_class_name.split('-')[1].capitalize()}: {best_confidence * 100:.2f}%"
         org = (x[0], y[0])  # Posição do texto
         cv2.putText(imagem_original, label, org, cv2.FONT_HERSHEY_SIMPLEX, 0.6, cor_preenchimento, 2, cv2.LINE_AA)
 
@@ -77,61 +80,68 @@ def segment_image(image_path, model):
     output_file = os.path.join(os.getcwd(), "output_segmented.jpg")
     cv2.imwrite(output_file, imagem_original)
 
-    return output_file, class_counts, class_confidences, segments_info
+    return output_file, best_class_name, best_confidence
 
 def main():
-    st.set_page_config(layout="wide")
-    st.title("Segmentação de Instâncias com YOLOv8")
-    st.write("Carregue uma imagem para aplicar a segmentação de instâncias usando YOLOv8.")
+    st.title("Classificador de Rochas")
+    st.subheader("Universidade Federal de Santa Maria")
+    st.markdown("Carregue uma imagem para aplicar a segmentação de instâncias usando YOLOv8.")
+    st.markdown("---")
 
-    uploaded_files = st.file_uploader("Escolha as imagens...", type=["jpg", "jpeg", "png", "tif", "tiff"], accept_multiple_files=True)
+    # Adicionar a opção de carregar arquivos
+    st.markdown("### Escolha as imagens...")
+    uploaded_files = st.file_uploader("", type=["jpg", "jpeg", "png", "tif", "tiff"], accept_multiple_files=True)
     
-    if uploaded_files:
-        num_columns = 6  # Defina o número de colunas desejado
+    # Adicionar a opção de tirar uma foto da câmera
+    st.markdown("### Tire uma foto")
+    camera_container = st.empty()
+    camera_image = camera_container.camera_input("")
+
+    if uploaded_files or camera_image:
+        num_columns = 3  # Defina o número de colunas desejado
         columns = st.columns(num_columns)
 
-        for i, uploaded_file in enumerate(uploaded_files):
-            # Salvar a imagem em um arquivo temporário
-            with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as temp_file:
-                temp_file.write(uploaded_file.getvalue())
-                image_path = temp_file.name
+        # Processar arquivos carregados
+        if uploaded_files:
+            for i, uploaded_file in enumerate(uploaded_files):
+                process_image(uploaded_file, i, columns, model)
+        
+        # Processar imagem da câmera
+        if camera_image:
+            process_image(camera_image, len(uploaded_files) if uploaded_files else 0, columns, model)
 
-            # Realizar a previsão e obter o resultado
-            output_file, class_counts, class_confidences, segments_info = segment_image(image_path, model)
+def process_image(image_file, index, columns, model):
+    # Salvar a imagem em um arquivo temporário
+    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as temp_file:
+        temp_file.write(image_file.getvalue())
+        image_path = temp_file.name
 
-            # Verificar se o arquivo temporário existe
-            if os.path.exists(output_file):
-                image = open(output_file, "rb").read()
-                
-                # Mostrar a imagem segmentada na coluna correta
-                col = columns[i % num_columns]
-                with col:
-                    st.image(image, caption=f"Imagem Segmentada - {uploaded_file.name}", use_column_width=True)
-                    
-                    # Exibir as classes detectadas com percentual de certeza
-                    st.write("Resultados de saída:")
-                    for class_name, count in class_counts.items():
-                        if count > 0:
-                            confidence_avg = np.mean(class_confidences[class_name]) * 100
-                            st.write(f"{class_name.split('-')[1].capitalize()}: {confidence_avg:.2f}% de certeza")
+    # Realizar a previsão e obter o resultado
+    output_file, best_class_name, best_confidence = segment_image(image_path, model)
 
-                    # Interface para revisão e ajuste manual
-                    st.write("Revise e ajuste as classificações manualmente:")
-                    for segment in segments_info:
-                        coords = segment['coords']
-                        original_class = segment['class_name']
-                        confidence = segment['confidence']
-                        st.write(f"Classe original: {original_class} com {confidence * 100:.2f}% de certeza")
-                        new_class = st.selectbox("Selecione a nova classe:", class_names, index=class_names.index(original_class), key=f"{uploaded_file.name}-{coords}")
-                        if st.button("Salvar alterações", key=f"save-{uploaded_file.name}-{coords}"):
-                            segment['class_name'] = new_class
-                            st.write(f"Classe alterada para {new_class}")
-            else:
-                st.write("Arquivo de saída não encontrado.")
+    # Verificar se o arquivo temporário existe
+    if os.path.exists(output_file):
+        image = open(output_file, "rb").read()
+        
+        # Mostrar a imagem segmentada na coluna correta
+        col = columns[index % 3]
+        with col:
+            st.image(image, caption=f"Imagem Segmentada - {image_file.name if hasattr(image_file, 'name') else 'Câmera'}", use_column_width=True)
+            
+            # Exibir a melhor classe detectada com percentual de certeza
+            st.markdown(f"**Resultados de saída:** {best_class_name.split('-')[1].capitalize()}: {best_confidence * 100:.2f}% de certeza")
 
-            # Remover o arquivo temporário
-            os.remove(image_path)
-            os.remove(output_file)
+            # Interface para revisão e ajuste manual
+            st.markdown("Revise e ajuste as classificações manualmente:")
+            new_class = st.selectbox("Selecione a nova classe:", class_names, index=class_names.index(best_class_name), key=f"{image_file.name if hasattr(image_file, 'name') else 'camera'}-{index}")
+            if st.button("Salvar alterações", key=f"save-{image_file.name if hasattr(image_file, 'name') else 'camera'}-{index}"):
+                st.write(f"Classe alterada para {new_class}")
+    else:
+        st.write("Arquivo de saída não encontrado.")
+
+    # Remover o arquivo temporário
+    os.remove(image_path)
+    os.remove(output_file)
 
 if __name__ == "__main__":
     main()
