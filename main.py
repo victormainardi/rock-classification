@@ -1,14 +1,14 @@
 import os
 import streamlit as st
-
-# Importar outras bibliotecas
+from streamlit_star_rating import st_star_rating
+import pandas as pd
+import datetime
 import cv2
 import tempfile
 import numpy as np
 import torch
 from PIL import Image
 from ultralytics import YOLO
-from pathlib import Path
 
 # Definir a configuração da página para widescreen
 st.set_page_config(layout="wide")
@@ -81,44 +81,46 @@ def segment_image(image_path, model):
 
     return output_file, best_class_name, best_confidence
 
-def main():
-    st.title("Classificador de Rochas - Grau de Esfericidade")
-    st.subheader("Universidade Federal de Santa Maria")
-    st.markdown("Carregue uma imagem para aplicar a segmentação de instâncias usando YOLOv8.")
-    st.markdown("---")
+# Função para registrar avaliações
+def log_rating(rating, user):
+    entry = {
+        "timestamp": datetime.datetime.now(),
+        "user": user,
+        "rating": rating
+    }
+    ratings.append(entry)
+    df = pd.DataFrame(ratings)
+    df.to_csv('ratings.csv', index=False)
 
-    # Adicionar a opção de carregar arquivos
-    st.markdown("### Escolha as imagens...")
-    uploaded_files = st.file_uploader("", type=["jpg", "jpeg", "png", "tif", "tiff"], accept_multiple_files=True)
-    
-    # Adicionar a opção para usar a câmera
-    use_camera = st.checkbox("Usar a câmera")
+def avaiable_app():
+    # Carregar o dataframe atual
+    if os.path.exists('ratings.csv'):
+        df = pd.read_csv('ratings.csv')
+    else:
+        df = pd.DataFrame(columns=['timestamp', 'user', 'rating'])
 
-    # Mostrar o input da câmera apenas se o checkbox estiver marcado
-    if use_camera:
-        st.markdown("### Tire uma foto")
-        camera_container = st.empty()
-        camera_image = camera_container.camera_input("")
+    st.title("Avaliação do Aplicativo de Classificação de Imagens")
 
-    if uploaded_files or (use_camera and camera_image):
-        num_columns = 3  # Defina o número de colunas desejado
-        columns = st.columns(num_columns)
+    # Entrada de nome de usuário (pode ser anônimo ou login real)
+    user = st.text_input("Seu Nome (opcional):", "")
 
-        # Processar arquivos carregados
-        if uploaded_files:
-            for i, uploaded_file in enumerate(uploaded_files):
-                process_image(uploaded_file, i, columns, model)
-        
-        # Processar imagem da câmera
-        if use_camera and camera_image:
-            process_image(camera_image, len(uploaded_files) if uploaded_files else 0, columns, model)
+    # Widget de classificação de estrelas
+    rating = st_star_rating(label="Por favor, avalie este aplicativo:", maxValue=5, defaultValue=0, key="rating")
 
-    # Adicionar a observação no rodapé
-    st.markdown("""
-        <div style='position: fixed; bottom: 0; width: 100%; background-color: #262730; color: white; text-align: center; padding: 10px;'>
-            Qualquer dúvida, entre em contato com a Equipe de Suporte Técnico do LAGEOLAM - Laboratório de Geologia Ambiental - <a href='mailto:haline.ceccato@gmail.com' style='color: #1f77b4;'>haline.ceccato@gmail.com</a>
-        </div>
-        """, unsafe_allow_html=True)
+    # Botão para enviar avaliação
+    if st.button("Enviar Avaliação"):
+        if rating:
+            log_rating(rating, user if user else "Anônimo")
+            st.success("Obrigado pela sua avaliação!")
+        else:
+            st.warning("Por favor, selecione uma avaliação antes de enviar.")
+
+    # Mostrar avaliações registradas
+    st.write("Avaliações Registradas")
+    if not df.empty:
+        st.write(df)
+    else:
+        st.write("Nenhuma avaliação registrada ainda.")
 
 def process_image(image_file, index, columns, model):
     # Salvar a imagem em um arquivo temporário
@@ -152,6 +154,49 @@ def process_image(image_file, index, columns, model):
     # Remover o arquivo temporário
     os.remove(image_path)
     os.remove(output_file)
+
+def main():
+    st.title("Classificador de Rochas - Grau de Esfericidade")
+    st.subheader("Universidade Federal de Santa Maria")
+    st.markdown("Carregue uma imagem para aplicar a segmentação de instâncias usando YOLOv8.")
+    st.markdown("---")
+
+    # Adicionar a opção de carregar arquivos
+    st.markdown("### Escolha as imagens...")
+    uploaded_files = st.file_uploader("", type=["jpg", "jpeg", "png", "tif", "tiff"], accept_multiple_files=True)
+    
+    # Adicionar a opção para usar a câmera
+    use_camera = st.checkbox("Usar a câmera")
+
+    # Mostrar o input da câmera apenas se o checkbox estiver marcado
+    if use_camera:
+        st.markdown("### Tire uma foto")
+        camera_container = st.empty()
+        camera_image = camera_container.camera_input("")
+
+    if uploaded_files or (use_camera and camera_image):
+        num_columns = 3  # Defina o número de colunas desejado
+        columns = st.columns(num_columns)
+
+        # Processar arquivos carregados
+        if uploaded_files:
+            for i, uploaded_file in enumerate(uploaded_files):
+                process_image(uploaded_file, i, columns, model)
+        
+        # Processar imagem da câmera
+        if use_camera and camera_image:
+            process_image(camera_image, len(uploaded_files) if uploaded_files else 0, columns, model)
+
+    avaiable_app()
+
+    # Adicionar a observação no rodapé
+    st.markdown("""
+        <div style='position: fixed; bottom: 0; width: 100%; background-color: #262730; color: white; text-align: center; padding: 10px;'>
+            Qualquer dúvida, entre em contato com a Equipe de Suporte Técnico do LAGEOLAM - Laboratório de Geologia Ambiental - <a href='mailto:haline.ceccato@gmail.com' style='color: #1f77b4;'>haline.ceccato@gmail.com</a>
+        </div>
+        """, unsafe_allow_html=True)
+
+ratings = []
 
 if __name__ == "__main__":
     main()
