@@ -10,6 +10,7 @@ import torch
 from PIL import Image
 from ultralytics import YOLO
 from fpdf import FPDF
+import uuid  # Biblioteca para gerar IDs únicos
 
 # Definir a configuração da página para widescreen
 st.set_page_config(layout="wide")
@@ -80,7 +81,7 @@ def segment_image(image_path, model):
     output_file = os.path.join(os.getcwd(), "output_segmented.jpg")
     cv2.imwrite(output_file, imagem_original)
 
-    return output_file, best_class_name, best_confidence
+    return output_file, class_id, best_confidence, best_segment
 
 # Função para registrar avaliações
 def log_rating(rating, user):
@@ -92,6 +93,33 @@ def log_rating(rating, user):
     ratings.append(entry)
     df = pd.DataFrame(ratings)
     df.to_csv('ratings.csv', index=False)
+
+# Função para gerar nomes únicos
+def generate_unique_filename(extension):
+    return str(uuid.uuid4()) + extension
+
+# Função para salvar imagem e anotações
+def save_image_and_annotations(image_path, class_id, segment):
+    # Gerar um nome de arquivo único para a imagem
+    image_filename = generate_unique_filename(".jpg")
+    annotation_filename = image_filename.replace(".jpg", ".txt")
+
+    # Salvar a imagem em um diretório específico
+    save_dir = os.path.join(os.getcwd(), "collected_images", class_names[class_id])
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    image_save_path = os.path.join(save_dir, image_filename)
+    annotation_save_path = os.path.join(save_dir, annotation_filename)
+
+    # Salvar a imagem
+    image = cv2.imread(image_path)
+    cv2.imwrite(image_save_path, image)
+
+    # Salvar as anotações
+    with open(annotation_save_path, "w") as f:
+        f.write(f"{class_id}\n")
+        for point in segment:
+            f.write(f"{point[0]} {point[1]}\n")
 
 def generate_pdf_report(images_info, df):
     pdf = FPDF()
@@ -115,7 +143,7 @@ def generate_pdf_report(images_info, df):
         pdf.image(image_info['path'], x=x_offset, y=y_position, w=col_width - margin)
         pdf.set_y(y_position + row_height - 20)
         pdf.set_x(x_offset)
-        pdf.cell(col_width, 10, txt=f"Classificação: {image_info['class']}", ln=False)
+        pdf.cell(col_width, 10, txt=f"Classificação: {class_names[image_info['class']]}", ln=False)
         pdf.ln(5)
         pdf.set_x(x_offset)
         pdf.cell(col_width, 10, txt=f"Confiança: {image_info['confidence'] * 100:.2f}%", ln=False)
@@ -183,7 +211,7 @@ def process_image(image_file, index, columns, model, images_info):
         image_path = temp_file.name
 
     # Realizar a previsão e obter o resultado
-    output_file, best_class_name, best_confidence = segment_image(image_path, model)
+    output_file, class_id, best_confidence, best_segment = segment_image(image_path, model)
 
     # Verificar se o arquivo temporário existe
     if os.path.exists(output_file):
@@ -195,17 +223,20 @@ def process_image(image_file, index, columns, model, images_info):
             st.image(image, caption=f"Imagem Segmentada - {image_file.name if hasattr(image_file, 'name') else 'Câmera'}", use_column_width=True)
             
             # Exibir a melhor classe detectada com percentual de certeza
-            st.markdown(f"**Saída:** {best_class_name.split('-')[1].capitalize()} - {best_confidence * 100:.2f}%")
+            st.markdown(f"**Saída:** {class_names[class_id].split('-')[1].capitalize()} - {best_confidence * 100:.2f}%")
 
             # Armazenar informações da imagem para o relatório
             images_info.append({
                 'path': output_file,
-                'class': best_class_name,
+                'class': class_id,
                 'confidence': best_confidence
             })
 
+            # Salvar imagem e anotações para retroalimentação do modelo
+            save_image_and_annotations(image_path, class_id, best_segment)
+
             # Interface para revisão e ajuste manual
-            new_class = st.selectbox("Selecione a nova classe:", class_names, index=class_names.index(best_class_name), key=f"{image_file.name if hasattr(image_file, 'name') else 'camera'}-{index}")
+            new_class = st.selectbox("Selecione a nova classe:", class_names, index=class_id, key=f"{image_file.name if hasattr(image_file, 'name') else 'camera'}-{index}")
             if st.button("Salvar alterações", key=f"save-{image_file.name if hasattr(image_file, 'name') else 'camera'}-{index}"):
                 st.write(f"Classe alterada para {new_class}")
     else:
