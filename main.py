@@ -9,6 +9,7 @@ import numpy as np
 import torch
 from PIL import Image
 from ultralytics import YOLO
+from fpdf import FPDF
 
 # Definir a configuração da página para widescreen
 st.set_page_config(layout="wide")
@@ -92,6 +93,47 @@ def log_rating(rating, user):
     df = pd.DataFrame(ratings)
     df.to_csv('ratings.csv', index=False)
 
+def generate_pdf_report(images_info, df):
+    pdf = FPDF()
+    pdf.add_page()
+
+    # Título
+    pdf.set_font("Arial", size=16)
+    pdf.cell(200, 10, txt="Relatório de Classificação", ln=True, align="C")
+    pdf.ln(10)
+
+    # Adicionar imagens em uma grade 2x2
+    pdf.set_font("Arial", size=12)
+    col_width = 95  # Largura da coluna para duas imagens por linha
+    row_height = 80  # Altura da imagem e espaço para texto
+    margin = 10  # Margem entre as colunas
+    for i, image_info in enumerate(images_info):
+        if i % 2 == 0 and i > 0:
+            pdf.ln(row_height + margin)  # Adicionar espaçamento entre linhas
+        x_offset = margin if i % 2 == 0 else col_width + 2 * margin
+        y_position = pdf.get_y()
+        pdf.image(image_info['path'], x=x_offset, y=y_position, w=col_width - margin)
+        pdf.set_y(y_position + row_height - 20)
+        pdf.set_x(x_offset)
+        pdf.cell(col_width, 10, txt=f"Classificação: {image_info['class']}", ln=False)
+        pdf.ln(5)
+        pdf.set_x(x_offset)
+        pdf.cell(col_width, 10, txt=f"Confiança: {image_info['confidence'] * 100:.2f}%", ln=False)
+        pdf.set_y(y_position)  # Resetar posição Y para a próxima imagem na linha
+
+    pdf.ln(row_height + margin)  # Adicionar espaçamento após as imagens
+
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, txt="Dados Quantitativos das Amostragens:", ln=True)
+
+    for index, row in df.iterrows():
+        pdf.cell(200, 10, txt=f"{row['timestamp']} - Usuário: {row['user']} - Avaliação: {row['rating']}", ln=True)
+
+    pdf_output_path = os.path.join(os.getcwd(), "relatorio_classificacao.pdf")
+    pdf.output(pdf_output_path)
+    return pdf_output_path
+
 def avaiable_app():
     # Carregar o dataframe atual
     if os.path.exists('ratings.csv'):
@@ -99,30 +141,42 @@ def avaiable_app():
     else:
         df = pd.DataFrame(columns=['timestamp', 'user', 'rating'])
 
-    st.title("Avaliação do Aplicativo de Classificação de Imagens")
+    # Interface compacta de avaliação do aplicativo
+    with st.expander("Avaliação do Aplicativo"):
+        # Injetar CSS para estilizar o campo de entrada de texto
+        st.markdown(
+            """
+            <style>
+            .stTextInput > div > div > input {
+                width: 50%;
+            }
+            </style>
+            """, 
+            unsafe_allow_html=True
+        )
 
-    # Entrada de nome de usuário (pode ser anônimo ou login real)
-    user = st.text_input("Seu Nome (opcional):", "")
+        # Entrada de nome de usuário (pode ser anônimo ou login real)
+        user = st.text_input("Seu Nome (opcional):", "")
 
-    # Widget de classificação de estrelas
-    rating = st_star_rating(label="Por favor, avalie este aplicativo:", maxValue=5, defaultValue=0, key="rating")
+        # Widget de classificação de estrelas
+        rating = st_star_rating(label="Por favor, avalie este aplicativo:", maxValue=5, defaultValue=0, key="rating")
 
-    # Botão para enviar avaliação
-    if st.button("Enviar Avaliação"):
-        if rating:
-            log_rating(rating, user if user else "Anônimo")
-            st.success("Obrigado pela sua avaliação!")
+        # Botão para enviar avaliação
+        if st.button("Enviar Avaliação"):
+            if rating:
+                log_rating(rating, user if user else "Anônimo")
+                st.success("Obrigado pela sua avaliação!")
+            else:
+                st.warning("Por favor, selecione uma avaliação antes de enviar.")
+
+        # Mostrar avaliações registradas
+        st.write("Avaliações Registradas")
+        if not df.empty:
+            st.write(df)
         else:
-            st.warning("Por favor, selecione uma avaliação antes de enviar.")
+            st.write("Nenhuma avaliação registrada ainda.")
 
-    # Mostrar avaliações registradas
-    st.write("Avaliações Registradas")
-    if not df.empty:
-        st.write(df)
-    else:
-        st.write("Nenhuma avaliação registrada ainda.")
-
-def process_image(image_file, index, columns, model):
+def process_image(image_file, index, columns, model, images_info):
     # Salvar a imagem em um arquivo temporário
     with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as temp_file:
         temp_file.write(image_file.getvalue())
@@ -143,8 +197,14 @@ def process_image(image_file, index, columns, model):
             # Exibir a melhor classe detectada com percentual de certeza
             st.markdown(f"**Saída:** {best_class_name.split('-')[1].capitalize()} - {best_confidence * 100:.2f}%")
 
+            # Armazenar informações da imagem para o relatório
+            images_info.append({
+                'path': output_file,
+                'class': best_class_name,
+                'confidence': best_confidence
+            })
+
             # Interface para revisão e ajuste manual
-            st.markdown("Revise e ajuste as classificações manualmente")
             new_class = st.selectbox("Selecione a nova classe:", class_names, index=class_names.index(best_class_name), key=f"{image_file.name if hasattr(image_file, 'name') else 'camera'}-{index}")
             if st.button("Salvar alterações", key=f"save-{image_file.name if hasattr(image_file, 'name') else 'camera'}-{index}"):
                 st.write(f"Classe alterada para {new_class}")
@@ -153,7 +213,6 @@ def process_image(image_file, index, columns, model):
 
     # Remover o arquivo temporário
     os.remove(image_path)
-    os.remove(output_file)
 
 def main():
     st.title("Classificador de Rochas - Grau de Esfericidade")
@@ -174,6 +233,8 @@ def main():
         camera_container = st.empty()
         camera_image = camera_container.camera_input("")
 
+    images_info = []
+
     if uploaded_files or (use_camera and camera_image):
         num_columns = 3  # Defina o número de colunas desejado
         columns = st.columns(num_columns)
@@ -181,13 +242,25 @@ def main():
         # Processar arquivos carregados
         if uploaded_files:
             for i, uploaded_file in enumerate(uploaded_files):
-                process_image(uploaded_file, i, columns, model)
+                process_image(uploaded_file, i, columns, model, images_info)
         
         # Processar imagem da câmera
         if use_camera and camera_image:
-            process_image(camera_image, len(uploaded_files) if uploaded_files else 0, columns, model)
+            process_image(camera_image, len(uploaded_files) if uploaded_files else 0, columns, model, images_info)
 
+    st.markdown("---")
     avaiable_app()
+
+    # Botão para exportar relatório PDF
+    if st.button("Exportar Relatório PDF"):
+        if os.path.exists('ratings.csv'):
+            df = pd.read_csv('ratings.csv')
+        else:
+            df = pd.DataFrame(columns=['timestamp', 'user', 'rating'])
+        
+        pdf_path = generate_pdf_report(images_info, df)
+        with open(pdf_path, "rb") as f:
+            st.download_button("Baixar Relatório PDF", f, file_name="relatorio_classificacao.pdf")
 
     # Adicionar a observação no rodapé
     st.markdown("""
