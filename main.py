@@ -9,7 +9,7 @@ st.set_page_config(page_title="Classificador de Morfologia do Agregado", layout=
 
 # Carregar o modelo de classificação
 device = torch.device('cpu')
-model_path = 'C:/v12/runs/classify/train11/weights/best.pt'  # Atualize com o caminho do modelo
+model_path = 'models/best_yolov8_seg.pt'  # Substitua pelo caminho correto do seu modelo
 model = YOLO(model_path)
 model.to(device)
 
