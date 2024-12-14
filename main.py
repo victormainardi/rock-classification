@@ -7,25 +7,31 @@ from ultralytics import YOLO
 # Configuração inicial
 st.set_page_config(page_title="Classificador de Morfologia do Agregado", layout="wide")
 
-# Carregar o modelo de classificação
+# Carregar o modelo de segmentação
 device = torch.device('cpu')
-model_path = 'models/best_yolov8_seg.pt'  # Substitua pelo caminho correto do seu modelo
+model_path = 'models/best_yolov8_seg.pt'
 model = YOLO(model_path)
 model.to(device)
 
 # Classes do modelo
 class_names = ['arredondado', 'subalongado', 'alongado', 'bem alongado']
 
-# Função para classificar imagens
+# Função para classificar imagens usando segmentação
 def classify_image(image_path, model):
-    results = model.predict(image_path)
-    class_id = results[0].probs.top1  # ID da classe prevista
-    confidence = results[0].probs.top1conf.item()  # Confiança da previsão
-    return class_id, confidence
+    results = model.predict(image_path)  # Faz a predição usando o modelo
+    boxes = results[0].boxes  # Obtém as caixas detectadas
+    
+    if boxes:  # Verifica se existem detecções
+        # Selecionar a caixa com maior confiança
+        highest_conf_index = torch.argmax(boxes.conf).item()  # Índice da maior confiança
+        class_id = int(boxes.cls[highest_conf_index].item())  # Classe correspondente
+        confidence = boxes.conf[highest_conf_index].item()  # Confiança correspondente
+        return class_id, confidence
+    else:
+        return None, None  # Caso não haja detecção
 
 # Interface principal
 def main():
-    # Cabeçalho
     st.title("🌍 Classificador de Rochas - Grau de Esfericidade")
     st.subheader("🧪 Sistema para classificação morfológica de agregados.")
     st.markdown("---")
@@ -57,7 +63,10 @@ def main():
 
             # Classificar a imagem capturada
             class_id, confidence = classify_image(image_path, model)
-            st.image(image_path, caption=f"Classe: {class_names[class_id]} ({confidence:.2%})", width=300)
+            if class_id is not None:
+                st.image(image_path, caption=f"Classe: {class_names[class_id]} ({confidence:.2%})", width=300)
+            else:
+                st.image(image_path, caption="Nenhuma classe detectada", width=300)
             os.remove(image_path)  # Remover arquivo temporário
 
     elif uploaded_files:
@@ -73,7 +82,10 @@ def main():
 
                 # Classificar a imagem
                 class_id, confidence = classify_image(image_path, model)
-                st.image(image_path, caption=f"Classe: {class_names[class_id]} ({confidence:.2%})", width=200)
+                if class_id is not None:
+                    st.image(image_path, caption=f"Classe: {class_names[class_id]} ({confidence:.2%})", width=200)
+                else:
+                    st.image(image_path, caption="Nenhuma classe detectada", width=200)
                 os.remove(image_path)
 
     else:
