@@ -4,39 +4,33 @@ import streamlit as st
 import torch
 from ultralytics import YOLO
 
-# Configuração inicial
 st.set_page_config(page_title="Classificador de Morfologia do Agregado", layout="wide")
 
-# Carregar o modelo de segmentação
 device = torch.device('cpu')
-model_path = 'models/best_yolov8_seg.pt'
+model_path = 'models/best.pt'
 model = YOLO(model_path)
 model.to(device)
 
 # Classes do modelo
 class_names = ['arredondado', 'subalongado', 'alongado', 'bem alongado']
 
-# Função para classificar imagens usando segmentação
 def classify_image(image_path, model):
-    results = model.predict(image_path)  # Faz a predição usando o modelo
-    boxes = results[0].boxes  # Obtém as caixas detectadas
+    results = model.predict(image_path)
+    boxes = results[0].boxes
     
-    if boxes:  # Verifica se existem detecções
-        # Selecionar a caixa com maior confiança
-        highest_conf_index = torch.argmax(boxes.conf).item()  # Índice da maior confiança
-        class_id = int(boxes.cls[highest_conf_index].item())  # Classe correspondente
-        confidence = boxes.conf[highest_conf_index].item()  # Confiança correspondente
+    if boxes:
+        highest_conf_index = torch.argmax(boxes.conf).item()
+        class_id = int(boxes.cls[highest_conf_index].item())
+        confidence = boxes.conf[highest_conf_index].item()
         return class_id, confidence
     else:
-        return None, None  # Caso não haja detecção
+        return None, None
 
-# Interface principal
 def main():
     st.title("🌍 Classificador de Rochas - Grau de Esfericidade")
     st.subheader("🧪 Sistema para classificação morfológica de agregados.")
     st.markdown("---")
 
-    # Barra lateral com instruções
     st.sidebar.title("📤 Selecione sua entrada")
     st.sidebar.info(
         "👋 **Instruções:**\n"
@@ -45,13 +39,12 @@ def main():
         "- O resultado será exibido abaixo de cada imagem."
     )
 
-    # Opção para usar a câmera ou carregar imagens
     use_camera = st.sidebar.checkbox("📸 Usar a câmera")
     uploaded_files = st.sidebar.file_uploader(
         "📂 Carregar imagens", type=["jpg", "jpeg", "png"], accept_multiple_files=True
     )
 
-    images_info = []  # Para armazenar os resultados
+    images_info = []
 
     if use_camera:
         st.markdown("### Tire uma foto usando sua câmera")
@@ -61,18 +54,16 @@ def main():
                 temp_file.write(camera_image.getvalue())
                 image_path = temp_file.name
 
-            # Classificar a imagem capturada
             class_id, confidence = classify_image(image_path, model)
             if class_id is not None:
                 st.image(image_path, caption=f"Classe: {class_names[class_id]} ({confidence:.2%})", width=300)
             else:
                 st.image(image_path, caption="Nenhuma classe detectada", width=300)
-            os.remove(image_path)  # Remover arquivo temporário
+            os.remove(image_path)
 
     elif uploaded_files:
-        # Processar imagens carregadas
         st.info("⏳ Processando imagens carregadas...")
-        columns = st.columns(3)  # Exibir em 3 colunas
+        columns = st.columns(3)
 
         for idx, uploaded_file in enumerate(uploaded_files):
             with columns[idx % 3]:
@@ -80,7 +71,6 @@ def main():
                     temp_file.write(uploaded_file.getvalue())
                     image_path = temp_file.name
 
-                # Classificar a imagem
                 class_id, confidence = classify_image(image_path, model)
                 if class_id is not None:
                     st.image(image_path, caption=f"Classe: {class_names[class_id]} ({confidence:.2%})", width=200)
@@ -91,7 +81,6 @@ def main():
     else:
         st.warning("⚠️ Nenhuma imagem carregada ou capturada. Por favor, escolha um método na barra lateral.")
 
-    # Rodapé
     st.markdown("---")
     st.markdown(
         "<div style='text-align: center;'>"
