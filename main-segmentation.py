@@ -1,6 +1,6 @@
 import os
 import streamlit as st
-from streamlit_star_rating import st_star_rating
+# from streamlit_star_rating import st_star_rating
 import pandas as pd
 import datetime
 import cv2
@@ -17,7 +17,7 @@ st.set_page_config(layout="wide")
 
 # Carregar o modelo YOLOv8 a partir de um arquivo local
 device = torch.device('cpu')
-model_path = 'models/yolov8_model.pt'  # Substitua pelo caminho correto do seu modelo
+model_path = 'models/best_yolov8_seg.pt'  # Substitua pelo caminho correto do seu modelo
 model = YOLO(model_path)
 model.to(device)
 
@@ -187,15 +187,15 @@ def avaiable_app():
         user = st.text_input("Seu Nome (opcional):", "")
 
         # Widget de classificação de estrelas
-        rating = st_star_rating(label="Por favor, avalie este aplicativo:", maxValue=5, defaultValue=0, key="rating")
+        # rating = st_star_rating(label="Por favor, avalie este aplicativo:", maxValue=5, defaultValue=0, key="rating")
 
         # Botão para enviar avaliação
-        if st.button("Enviar Avaliação"):
-            if rating:
-                log_rating(rating, user if user else "Anônimo")
-                st.success("Obrigado pela sua avaliação!")
-            else:
-                st.warning("Por favor, selecione uma avaliação antes de enviar.")
+        # if st.button("Enviar Avaliação"):
+        #     if rating:
+        #         log_rating(rating, user if user else "Anônimo")
+        #         st.success("Obrigado pela sua avaliação!")
+        #     else:
+        #         st.warning("Por favor, selecione uma avaliação antes de enviar.")
 
         # Mostrar avaliações registradas
         st.write("Avaliações Registradas")
