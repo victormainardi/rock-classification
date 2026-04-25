@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(iconv -f UTF-16LE -t UTF-8 requirements.txt)",
+      "Bash(python3)",
+      "Bash(python3 -c \"import sys; open\\('requirements.txt.tmp', 'w', encoding='utf-8'\\).write\\(open\\('requirements.txt', 'r', encoding='utf-16'\\).read\\(\\)\\)\")",
+      "Bash(mv requirements.txt.tmp requirements.txt)",
+      "Bash(git checkout *)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'fix: convert requirements.txt from UTF-16 to UTF-8 encoding *)"
+    ]
+  }
+}
