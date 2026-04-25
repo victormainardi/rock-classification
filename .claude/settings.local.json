@@ -11,7 +11,8 @@
       "WebFetch(domain:github.com)",
       "Bash(git commit -m 'fix: remove opencv-python, keep only headless for Streamlit Cloud *)",
       "Bash(git push *)",
-      "Bash(git commit -m 'fix: remove opencv-python-headless, let ultralytics handle dependencies *)"
+      "Bash(git commit -m 'fix: remove opencv-python-headless, let ultralytics handle dependencies *)",
+      "Bash(git commit -m 'fix: lazy load ultralytics model to avoid libGL import errors *)"
     ]
   }
 }
