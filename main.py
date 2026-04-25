@@ -2,17 +2,19 @@ import os
 import tempfile
 import streamlit as st
 import torch
-from ultralytics import YOLO
 
 st.set_page_config(page_title="Classificador de Morfologia do Agregado", layout="wide")
 
-device = torch.device('cpu')
-model_path = 'models/best.pt'
-model = YOLO(model_path)
-model.to(device)
-
-# Classes do modelo
 class_names = ['arredondado', 'subalongado', 'alongado', 'bem alongado']
+
+@st.cache_resource
+def load_model():
+    from ultralytics import YOLO
+    device = torch.device('cpu')
+    model_path = 'models/best.pt'
+    model = YOLO(model_path)
+    model.to(device)
+    return model
 
 def classify_image(image_path, model):
     results = model.predict(image_path)
@@ -45,6 +47,7 @@ def main():
     )
 
     images_info = []
+    model = load_model()
 
     if use_camera:
         st.markdown("### Tire uma foto usando sua câmera")
