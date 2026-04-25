@@ -10,7 +10,8 @@
       "Bash(git commit -m 'fix: convert requirements.txt from UTF-16 to UTF-8 encoding *)",
       "WebFetch(domain:github.com)",
       "Bash(git commit -m 'fix: remove opencv-python, keep only headless for Streamlit Cloud *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(git commit -m 'fix: remove opencv-python-headless, let ultralytics handle dependencies *)"
     ]
   }
 }
